@@ -17,8 +17,8 @@ jobs:
           DATE=$(date +%Y%m%d)
           SEED=$((10#$DATE))
           
-          # 获取天气 (使用 wttr.in)
-          WEATHER=$(curl -s "wttr.in/?format=%c%t" 2>/dev/null || echo "☀️ 20°C")
+          # 获取合肥天气 (使用 wttr.in)
+          WEATHER=$(curl -s "wttr.in/Hefei?format=%c%t" 2>/dev/null || echo "☀️ 20°C")
           
           # 解析天气和温度
           TEMP=$(echo "$WEATHER" | grep -oE '[0-9]+' | head -1)
@@ -26,8 +26,53 @@ jobs:
             TEMP=20
           fi
           
-          # 判断季节 (3-5春, 6-8夏, 9-11秋, 12-2冬)
+          # 判断季节 (3-5春, 6-8夏, 9-11秋, 12-2冬) - 合肥四季
           MONTH=$(date +%m)
+          
+          # 合肥/安徽四季特色祝福
+          SPRING_GREETINGS=(
+            "巢湖之滨 春光烂漫"
+            "庐州春晓 万物复苏"
+            "春风又绿江南岸"
+            "紫蓬山青 春天你好"
+            "合肥的春天 诗意盎然"
+            "油菜花黄 皖中春浓"
+            "春回庐州 万物生长"
+            "淮河两岸 春意融融"
+          )
+          
+          SUMMER_GREETINGS=(
+            "巢湖夏日 荷香阵阵"
+            "合肥盛夏 热情似火"
+            "夏夜微风 蜀山纳凉"
+            "烈日炎炎 活力满满"
+            "合肥夏天 热情相随"
+            "蝉鸣夏日 青春正好"
+            "高温不退 激情不退"
+            "夏日合肥 活力四射"
+          )
+          
+          AUTUMN_GREETINGS=(
+            "合肥金秋 收获满满"
+            "庐州秋色 层林尽染"
+            "秋风起 落叶黄"
+            "天鹅湖畔 秋意浓"
+            "合肥的秋 静美如画"
+            "秋高气爽 合肥你好"
+            "银杏金黄 岁月静好"
+            "秋日合肥 温柔以待"
+          )
+          
+          WINTER_GREETINGS=(
+            "合肥冬日 温暖在心"
+            "庐州雪景 静谧美好"
+            "冬日暖阳 合肥相伴"
+            "寒风虽冷 温暖相随"
+            "合肥的冬 静待春归"
+            "雪花纷飞 庐州静美"
+            "冬日合肥 温情常在"
+            "傲雪寒梅 合肥冬韵"
+          )
           if [ "$MONTH" -ge "03" ] && [ "$MONTH" -le "05" ]; then
             SEASON="spring"
           elif [ "$MONTH" -ge "06" ] && [ "$MONTH" -le "08" ]; then
@@ -524,10 +569,28 @@ jobs:
           BASE_MSG="${GREETINGS[$INDEX]}"
           DAY_MSG=$(echo "$BASE_MSG" | sed 's/^[0-9]*\.//')
           
-          # 组合最终消息：日期祝福 + 天气祝福
-          FINAL_MSG="$DAY_MSG | $WEATHER_MSG"
+          # 根据季节选择合肥特色祝福
+          if [ "$SEASON" == "spring" ]; then
+            idx=$((RANDOM % ${#SPRING_GREETINGS[@]}))
+            SEASON_MSG="${SPRING_GREETINGS[$idx]}"
+          elif [ "$SEASON" == "summer" ]; then
+            idx=$((RANDOM % ${#SUMMER_GREETINGS[@]}))
+            SEASON_MSG="${SUMMER_GREETINGS[$idx]}"
+          elif [ "$SEASON" == "autumn" ]; then
+            idx=$((RANDOM % ${#AUTUMN_GREETINGS[@]}))
+            SEASON_MSG="${AUTUMN_GREETINGS[$idx]}"
+          elif [ "$SEASON" == "winter" ]; then
+            idx=$((RANDOM % ${#WINTER_GREETINGS[@]}))
+            SEASON_MSG="${WINTER_GREETINGS[$idx]}"
+          else
+            SEASON_MSG="美好的一天"
+          fi
+          
+          # 组合最终消息：日期祝福 + 季节 + 天气
+          FINAL_MSG="$DAY_MSG | $SEASON_MSG | 合肥$WEATHER_MSG ${TEMP}°C"
           
           # 发送到飞书
           curl -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"🌅 早安！$FINAL_MSG\"}}"
+
