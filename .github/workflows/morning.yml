@@ -2,6 +2,7 @@ name: 每日早安祝福
 
 on:
   schedule:
+    # UTC 23:30 = 北京时间 7:30
     - cron: '30 23 * * *'
   workflow_dispatch:
 
@@ -13,11 +14,12 @@ jobs:
         env:
           WEBHOOK: ${{ secrets.WEBHOOK }}
         run: |
-          # 获取日期
-          DATE=$(date +%Y%m%d)
+          # 获取日期 (北京时间)
+          BEIJING_TZ="Asia/Shanghai"
+          DATE=$(TZ=$BEIJING_TZ date +%Y%m%d)
           SEED=$((10#$DATE))
           
-          # 获取合肥天气 (使用 wttr.in)
+          # 获取合肥天气 (使用 wttr.in，强制北京时间)
           WEATHER=$(curl -s "wttr.in/Hefei?format=%c%t" 2>/dev/null || echo "☀️ 20°C")
           
           # 解析天气和温度
@@ -26,8 +28,11 @@ jobs:
             TEMP=20
           fi
           
-          # 判断季节 (3-5春, 6-8夏, 9-11秋, 12-2冬) - 合肥四季
-          MONTH=$(date +%m)
+          # 获取北京时间
+          BEIJING_TZ="Asia/Shanghai"
+          
+          # 判断季节 (3-5春, 6-8夏, 9-11秋, 12-2冬) - 用北京时间
+          MONTH=$(TZ=$BEIJING_TZ date +%m)
           
           # 合肥/安徽四季特色祝福
           SPRING_GREETINGS=(
@@ -587,10 +592,9 @@ jobs:
           fi
           
           # 组合最终消息：日期祝福 + 季节 + 天气
-          FINAL_MSG="$DAY_MSG | $SEASON_MSG | 合肥$WEATHER_MSG ${TEMP}°C"
+          FINAL_MSG="$DAY_MSG | $SEASON_MSG | 合肥$WEATHER_MSG"
           
           # 发送到飞书
           curl -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"🌅 早安！$FINAL_MSG\"}}"
-
