@@ -1,0 +1,120 @@
+name: 每日AI新闻
+
+on:
+  schedule:
+    # UTC 23:30 = 北京时间 7:30 (加上GitHub延迟约8:00收到)
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取并发送AI新闻
+        env:
+          WEBHOOK: ${{ secrets.WEBHOOK }}
+        run: |
+          export TZ='Asia/Shanghai'
+          
+          echo "开始获取AI新闻..."
+          
+          NEWS_ITEMS=()
+          
+          # 翻译函数 (使用免费翻译API)
+          translate() {
+            local text="$1"
+            # 使用 Google Translate API (免费)
+            local translated=$(curl -s "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=$(echo "$text" | sed 's/ /%20/g')" 2>/dev/null | grep -o '\[.*\]' | head -1 | grep -o '"[^"]*"' | head -1 | sed 's/"//g')
+            
+            if [ -n "$translated" ]; then
+              echo "$translated"
+            else
+              echo "$text"
+            fi
+          }
+          
+          # 1. 获取 Hacker News AI 相关 (英文翻译成中文)
+          echo "获取 Hacker News..."
+          HN_DATA=$(curl -s "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null || echo "[]")
+          HN_IDS=$(echo "$HN_DATA" | grep -oE '[0-9]+' | head -50)
+          
+          for id in $HN_IDS; do
+            ITEM=$(curl -s "https://hacker-news.firebaseio.com/v0/item/$id.json" 2>/dev/null || echo "")
+            TITLE=$(echo "$ITEM" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//' | head -1)
+            URL=$(echo "$ITEM" | grep -o '"url":"[^"]*"' | sed 's/"url":"//;s/"$//' | head -1)
+            
+            if echo "$TITLE" | grep -qiE "AI|GPT|OpenAI|Claude|LLM|artificial|machine learning|deep learning|ChatGPT|neural|automation|AGI|Gemini|Copilot|Midjourney|Stable"; then
+              if [ -n "$TITLE" ] && [ -n "$URL" ]; then
+                # 翻译标题
+                TITLE_CN=$(translate "$TITLE")
+                NEWS_ITEMS+=("🔹 $TITLE_CN\n   📰 来源：Hacker News\n   🔗 $URL")
+              fi
+            fi
+            
+            if [ ${#NEWS_ITEMS[@]} -ge 10 ]; then
+              break
+            fi
+          done
+          
+          # 2. 获取中文 AI 新闻
+          echo "获取中文AI新闻..."
+          
+          # 机器之心
+          JQ_DATA=$(curl -s "https://www.jiqizhixin.com/api/v1/articles?page=1&per=10" 2>/dev/null || echo "")
+          if [ -n "$JQ_DATA" ]; then
+            echo "$JQ_DATA" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//g' | head -5 | while read -r title; do
+              if [ -n "$title" ]; then
+                NEWS_ITEMS+=("🔹 $title\n   📰 来源：机器之心\n   🔗 https://www.jiqizhixin.com")
+              fi
+              
+              if [ ${#NEWS_ITEMS[@]} -ge 10 ]; then
+                break
+              fi
+            done
+          fi
+          
+          # 3. 如果新闻不够，补充热点
+          if [ ${#NEWS_ITEMS[@]} -lt 5 ]; then
+            echo "补充热点新闻..."
+            BACKUP_NEWS=(
+              "🔹 OpenAI 发布最新动态\n   📰 来源：OpenAI 官方\n   🔗 https://openai.com/blog"
+              "🔹 Anthropic Claude 更新\n   📰 来源：Anthropic 官方\n   🔗 https://anthropic.com"
+              "🔹 国内大模型最新进展\n   📰 来源：机器之心\n   🔗 https://www.jiqizhixin.com"
+              "🔹 AI 行业热点资讯\n   📰 来源：36氪\n   🔗 https://www.36kr.com/information/AI"
+              "🔹 Google AI 最新研究\n   📰 来源：Google AI Blog\n   🔗 https://blog.google/technology/ai/"
+            )
+            
+            for news in "${BACKUP_NEWS[@]}"; do
+              NEWS_ITEMS+=("$news")
+              if [ ${#NEWS_ITEMS[@]} -ge 10 ]; then
+                break
+              fi
+            done
+          fi
+          
+          # 构建消息
+          TODAY=$(date "+%Y年%m月%d日")
+          MESSAGE="📰 每日AI新闻 - $TODAY\n\n"
+          MESSAGE="${MESSAGE}━━━━━━━━━━━━━━━━\n\n"
+          
+          # 取前10条新闻
+          COUNT=0
+          for item in "${NEWS_ITEMS[@]}"; do
+            if [ $COUNT -ge 10 ]; then
+              break
+            fi
+            MESSAGE="${MESSAGE}${item}\n\n"
+            COUNT=$((COUNT + 1))
+          done
+          
+          MESSAGE="${MESSAGE}━━━━━━━━━━━━━━━━\n"
+          MESSAGE="${MESSAGE}🤖 AI 精选 | 共 ${COUNT} 条新闻\n"
+          MESSAGE="${MESSAGE}⏰ $(date '+%H:%M') 更新"
+          
+          echo "发送消息..."
+          echo -e "$MESSAGE"
+          
+          # 发送到飞书
+          curl -X POST "$WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"$MESSAGE\"}}"
