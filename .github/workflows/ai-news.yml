@@ -1,8 +1,8 @@
-name: 每日财经AI新闻摘要
+name: 姣忔棩璐㈢粡AI鏂伴椈鎽樿
 
 on:
   schedule:
-    # UTC 23:00 = 北京时间 7:00 (GitHub延迟约8:00收到)
+    # UTC 23:00 = 鍖椾含鏃堕棿 7:00 (GitHub寤惰繜绾?:00鏀跺埌)
     - cron: '0 23 * * *'
   workflow_dispatch:
 
@@ -10,22 +10,21 @@ jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 获取新闻并生成摘要
-        env:
+      - name: 鑾峰彇鏂伴椈骞剁敓鎴愭憳瑕?        env:
           WEBHOOK: ${{ secrets.WEBHOOK }}
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
         run: |
           export TZ='Asia/Shanghai'
           
-          echo "开始获取财经AI新闻..."
+          echo "寮€濮嬭幏鍙栬储缁廇I鏂伴椈..."
           
-          # ========== 1. 获取华尔街见闻新闻 ==========
-          echo "获取华尔街见闻..."
+          # ========== 1. 鑾峰彇鍗庡皵琛楄闂绘柊闂?==========
+          echo "鑾峰彇鍗庡皵琛楄闂?.."
           NEWS_ARRAY=()
           
           WS_RSS=$(curl -s "https://wallstreetcn.com/rss" 2>/dev/null || echo "")
           if [ -n "$WS_RSS" ]; then
-            # 解析RSS
+            # 瑙ｆ瀽RSS
             ITEMS=$(echo "$WS_RSS" | grep -oE '<item>[^<]*</item>' | head -30)
             for item in $ITEMS; do
               TITLE=$(echo "$item" | grep -oE '<title><!\[CDATA\[[^\]]*\]\]></title>' | sed 's/<title><!\[CDATA\[//g; s/\]\]><\/title>//g')
@@ -33,17 +32,16 @@ jobs:
               DESC=$(echo "$item" | grep -oE '<description><!\[CDATA\[[^\]]*\]\]></description>' | sed 's/<description><!\[CDATA\[//g; s/\]\]><\/description>//g' | head -1)
               
               if [ -n "$TITLE" ] && [ -n "$LINK" ]; then
-                # 清理HTML标签
+                # 娓呯悊HTML鏍囩
                 DESC=$(echo "$DESC" | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g; s/&amp;/&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g' | tr -s ' ')
-                # 截取描述前200字
-                DESC=$(echo "$DESC" | cut -c1-200)
+                # 鎴彇鎻忚堪鍓?00瀛?                DESC=$(echo "$DESC" | cut -c1-200)
                 NEWS_ARRAY+=("$TITLE|||$DESC|||$LINK")
               fi
             done
           fi
           
-          # ========== 2. 获取36kr财经新闻 ==========
-          echo "获取36kr财经新闻..."
+          # ========== 2. 鑾峰彇36kr璐㈢粡鏂伴椈 ==========
+          echo "鑾峰彇36kr璐㈢粡鏂伴椈..."
           KR_DATA=$(curl -s "https://36kr.com/api/newsflash?per_page=20" 2>/dev/null || echo "")
           if [ -n "$KR_DATA" ]; then
             TITLES=$(echo "$KR_DATA" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//g' | head -15)
@@ -58,8 +56,8 @@ jobs:
             done
           fi
           
-          # ========== 3. 如果新闻不够，补充AI科技新闻 ==========
-          echo "获取AI科技新闻..."
+          # ========== 3. 濡傛灉鏂伴椈涓嶅锛岃ˉ鍏匒I绉戞妧鏂伴椈 ==========
+          echo "鑾峰彇AI绉戞妧鏂伴椈..."
           HN_DATA=$(curl -s "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null || echo "[]")
           HN_IDS=$(echo "$HN_DATA" | grep -oE '[0-9]+' | head -30)
           
@@ -72,17 +70,17 @@ jobs:
             URL=$(echo "$ITEM" | grep -o '"url":"[^"]*"' | sed 's/"url":"//;s/"$//' | head -1)
             SCORE=$(echo "$ITEM" | grep -o '"score":[0-9]*' | sed 's/"score"://' | head -1)
             
-            # 过滤财经科技相关
+            # 杩囨护璐㈢粡绉戞妧鐩稿叧
             if echo "$TITLE" | grep -qiE "AI|fintech|stock|market|crypto|bank|tech|robot|automated|system|software|data|cloud|startup|fund|invest"; then
               if [ -n "$TITLE" ] && [ -n "$URL" ] && [ "$SCORE" -gt 50 ]; then
-                NEWS_ARRAY+=("$TITLE|||热榜关注||| $URL")
+                NEWS_ARRAY+=("$TITLE|||鐑鍏虫敞||| $URL")
               fi
             fi
           done
           
-          echo "获取到 ${#NEWS_ARRAY[@]} 条新闻"
+          echo "鑾峰彇鍒?${#NEWS_ARRAY[@]} 鏉℃柊闂?
           
-          # ========== 4. 选取10条新闻 ==========
+          # ========== 4. 閫夊彇10鏉℃柊闂?==========
           SELECTED_NEWS=()
           for i in $(seq 0 9); do
             if [ $i -lt ${#NEWS_ARRAY[@]} ]; then
@@ -90,82 +88,76 @@ jobs:
             fi
           done
           
-          # ========== 5. 构建新闻列表 ==========
+          # ========== 5. 鏋勫缓鏂伴椈鍒楄〃 ==========
           NEWS_LIST=""
           for i in "${!SELECTED_NEWS[@]}"; do
             news="${SELECTED_NEWS[$i]}"
             title=$(echo "$news" | cut -d'|' -f1)
             desc=$(echo "$news" | cut -d'|' -f2)
             url=$(echo "$news" | cut -d'|' -f3)
-            NEWS_LIST="${NEWS_LIST}${i}. $title\n   摘要: $desc\n   链接: $url\n\n"
+            NEWS_LIST="${NEWS_LIST}${i}. $title\n   鎽樿: $desc\n   閾炬帴: $url\n\n"
           done
           
-          # ========== 6. 调用AI生成摘要 ==========
-          echo "调用AI生成精炼摘要..."
+          # ========== 6. 璋冪敤AI鐢熸垚鎽樿 ==========
+          echo "璋冪敤AI鐢熸垚绮剧偧鎽樿..."
           
-          PROMPT="你是一个专业的财经科技新闻编辑。请为以下10条新闻生成简洁的中文摘要，每条50字左右。
+          PROMPT="浣犳槸涓€涓笓涓氱殑璐㈢粡绉戞妧鏂伴椈缂栬緫銆傝涓轰互涓?0鏉℃柊闂荤敓鎴愮畝娲佺殑涓枃鎽樿锛屾瘡鏉?0瀛楀乏鍙炽€?
+鏂伴椈鍒楄〃锛?$NEWS_LIST
 
-新闻列表：
-$NEWS_LIST
+瑕佹眰锛?1. 姣忔潯鏂伴椈鐢熸垚绠€鐭憳瑕侊紙50瀛椾互鍐咃級
+2. 淇濈暀鍘熸枃鏍囬
+3. 鍥介檯鏂伴椈鏍囨敞馃實锛屽浗鍐呮柊闂绘爣娉焽焽?4. 鎽樿瑕佹姄浣忔柊闂荤殑鏍稿績瑕佺偣
 
-要求：
-1. 每条新闻生成简短摘要（50字以内）
-2. 保留原文标题
-3. 国际新闻标注🌍，国内新闻标注🇨🇳
-4. 摘要要抓住新闻的核心要点
+鏍煎紡锛?銆愷煂?馃嚚馃嚦銆慬搴忓彿].[鏍囬]
+   馃摑 [鎽樿]
+   馃敆 [閾炬帴]
 
-格式：
-【🌍/🇨🇳】[序号].[标题]
-   📝 [摘要]
-   🔗 [链接]
+娉ㄦ剰锛氬彧闇€瑕佽緭鍑烘暣鐞嗗ソ鐨勬柊闂伙紝涓嶈鍏朵粬璇存槑銆?
 
-注意：只需要输出整理好的新闻，不要其他说明。"
-
-          # 调用硅基流动API
+          # 璋冪敤纭呭熀娴佸姩API
           RESPONSE=$(curl -s -X POST "https://api.siliconflow.cn/v1/chat/completions" \
             -H "Authorization: Bearer $SILICONFLOW_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{
               "model": "Qwen/Qwen2.5-7B-Instruct",
               "messages": [
-                {"role": "system", "content": "你是一个专业的财经科技新闻编辑，擅长生成简洁准确的中文摘要。"},
+                {"role": "system", "content": "浣犳槸涓€涓笓涓氱殑璐㈢粡绉戞妧鏂伴椈缂栬緫锛屾搮闀跨敓鎴愮畝娲佸噯纭殑涓枃鎽樿銆?},
                 {"role": "user", "content": "'"$PROMPT"'"}
               ],
               "max_tokens": 2000,
               "temperature": 0.7
             }')
           
-          # 解析AI响应
+          # 瑙ｆ瀽AI鍝嶅簲
           SUMMARY=$(echo "$RESPONSE" | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -1)
           
-          # 清理转义字符
+          # 娓呯悊杞箟瀛楃
           SUMMARY=$(echo "$SUMMARY" | sed 's/\\n/\n/g; s/\\"/"/g')
           
           if [ -z "$SUMMARY" ] || [ "$SUMMARY" == "null" ]; then
-            # 如果AI生成失败，使用原始新闻
-            SUMMARY="$NEWS_LIST"
+            # 濡傛灉AI鐢熸垚澶辫触锛屼娇鐢ㄥ師濮嬫柊闂?            SUMMARY="$NEWS_LIST"
           fi
           
-          # ========== 7. 构建最终消息 ==========
-          TODAY=$(date "+%Y年%m月%d日")
+          # ========== 7. 鏋勫缓鏈€缁堟秷鎭?==========
+          TODAY=$(date "+%Y骞?m鏈?d鏃?)
           TIME=$(date "+%H:%M")
           
-          FINAL_MSG="📊 每日财经科技新闻
-━━━━━━━━━━━━━━━━━━
-$TODAY | 🕐 $TIME
+          FINAL_MSG="馃搳 姣忔棩璐㈢粡绉戞妧鏂伴椈
+鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣
+$TODAY | 馃晲 $TIME
 
 $SUMMARY
 
-━━━━━━━━━━━━━━━━━━
-💡 点击链接查看详情
-🤖 AI摘要生成"
+鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣
+馃挕 鐐瑰嚮閾炬帴鏌ョ湅璇︽儏
+馃 AI鎽樿鐢熸垚"
           
-          echo "发送消息到飞书..."
+          echo "鍙戦€佹秷鎭埌椋炰功..."
           echo -e "$FINAL_MSG"
           
-          # 发送到飞书
+          # 鍙戦€佸埌椋炰功
           curl -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"$FINAL_MSG\"}}"
           
-          echo "完成！共发送 ${#SELECTED_NEWS[@]} 条新闻"
+          echo "瀹屾垚锛佸叡鍙戦€?${#SELECTED_NEWS[@]} 鏉℃柊闂?
