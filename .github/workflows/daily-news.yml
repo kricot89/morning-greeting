@@ -15,11 +15,80 @@ jobs:
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
         run: |
           export TZ='Asia/Shanghai'
-          echo "Testing workflow at $(date)"
-          echo "Sending test message to Feishu..."
+          echo "开始获取财经AI新闻..."
 
-          curl -X POST "$WEBHOOK" \
+          NEWS_LIST=""
+          COUNT=0
+
+          # ========== 1. 华尔街见闻 RSS ==========
+          WS_RSS=$(curl -s --max-time 10 "https://wallstreetcn.com/rss" 2>/dev/null || echo "")
+          if [ -n "$WS_RSS" ]; then
+            while IFS= read -r line; do
+              if echo "$line" | grep -q "<title>"; then
+                TITLE=$(echo "$line" | sed 's/.*<title><!\[CDATA\[//;s/\]\]><\/title>.*//' | sed 's/.*<title>//;s/<\/title>.*//')
+                if [ -n "$TITLE" ] && [ "$TITLE" != "华尔街见闻" ] && [ $COUNT -lt 6 ]; then
+                  COUNT=$((COUNT+1))
+                  NEWS_LIST="${NEWS_LIST}${COUNT}. 🇨🇳 ${TITLE}\n"
+                fi
+              fi
+              if echo "$line" | grep -q "<link>"; then
+                LINK=$(echo "$line" | sed 's/.*<link>//;s/<\/link>.*//')
+                if echo "$LINK" | grep -q "wallstreetcn"; then
+                  NEWS_LIST="${NEWS_LIST}   🔗 ${LINK}\n\n"
+                fi
+              fi
+            done <<< "$WS_RSS"
+          fi
+
+          # ========== 2. Hacker News AI/科技新闻 ==========
+          HN_IDS=$(curl -s --max-time 10 "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null | grep -oE '[0-9]+' | head -50)
+          HN_COUNT=0
+          for id in $HN_IDS; do
+            if [ $HN_COUNT -ge 4 ]; then break; fi
+            ITEM=$(curl -s --max-time 5 "https://hacker-news.firebaseio.com/v0/item/$id.json" 2>/dev/null)
+            TITLE=$(echo "$ITEM" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//')
+            URL=$(echo "$ITEM" | grep -o '"url":"[^"]*"' | sed 's/"url":"//;s/"$//')
+            SCORE=$(echo "$ITEM" | grep -o '"score":[0-9]*' | sed 's/"score"://')
+            if echo "$TITLE" | grep -qiE "AI|LLM|GPT|model|fintech|market|startup|fund|invest|tech" && [ -n "$URL" ] && [ "${SCORE:-0}" -gt 100 ]; then
+              COUNT=$((COUNT+1))
+              HN_COUNT=$((HN_COUNT+1))
+              NEWS_LIST="${NEWS_LIST}${COUNT}. 🌍 ${TITLE}\n   🔗 ${URL}\n\n"
+            fi
+          done
+
+          echo "共获取 $COUNT 条新闻"
+
+          # ========== 3. AI生成摘要 ==========
+          if [ -n "$SILICONFLOW_API_KEY" ] && [ $COUNT -gt 0 ]; then
+            PROMPT="请为以下新闻标题各写一句话摘要（20字以内），格式保持不变，在标题后加一行：📝 [摘要]\n\n${NEWS_LIST}"
+            ESCAPED_PROMPT=$(echo "$PROMPT" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$PROMPT\"")
+
+            RESPONSE=$(curl -s --max-time 30 -X POST "https://api.siliconflow.cn/v1/chat/completions" \
+              -H "Authorization: Bearer $SILICONFLOW_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"model\":\"Qwen/Qwen2.5-7B-Instruct\",\"messages\":[{\"role\":\"user\",\"content\":$ESCAPED_PROMPT}],\"max_tokens\":1500}" 2>/dev/null)
+
+            SUMMARY=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['choices'][0]['message']['content'])" 2>/dev/null)
+          fi
+
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY=$(echo -e "$NEWS_LIST")
+          fi
+
+          # ========== 4. 发送飞书 ==========
+          TODAY=$(date "+%Y年%m月%d日")
+          MSG="📊 每日财经科技新闻
+━━━━━━━━━━━━━━━━━━
+${TODAY}
+
+${SUMMARY}
+━━━━━━━━━━━━━━━━━━
+🤖 AI摘要 | 点链接查看详情"
+
+          ESCAPED_MSG=$(echo "$MSG" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$MSG\"")
+
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d '{"msg_type": "text", "content": {"text": "测试消息：财经新闻工作流已启动！\n时间：'"$(date "+%Y-%m-%d %H:%M:%S")"'"}}'
+            -d "{\"msg_type\":\"text\",\"content\":{\"text\":$ESCAPED_MSG}}"
 
-          echo "Done!"
+          echo "发送完成！"
