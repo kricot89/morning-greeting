@@ -1,10 +1,10 @@
 name: 每日财经AI新闻摘要
 
 on:
+  workflow_dispatch:
   schedule:
     # UTC 22:30 = 北京时间 6:30 (GitHub延迟约8:00收到)
     - cron: '30 22 * * *'
-  workflow_dispatch:
 
 jobs:
   send:
@@ -16,13 +16,13 @@ jobs:
           SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
         run: |
           export TZ='Asia/Shanghai'
-          
+
           echo "开始获取财经AI新闻..."
-          
+
           # ========== 1. 获取华尔街见闻新闻 ==========
           echo "获取华尔街见闻..."
           NEWS_ARRAY=()
-          
+
           WS_RSS=$(curl -s "https://wallstreetcn.com/rss" 2>/dev/null || echo "")
           if [ -n "$WS_RSS" ]; then
             # 解析RSS
@@ -31,17 +31,17 @@ jobs:
               TITLE=$(echo "$item" | grep -oE '<title><!\[CDATA\[[^\]]*\]\]></title>' | sed 's/<title><!\[CDATA\[//g; s/\]\]><\/title>//g')
               LINK=$(echo "$item" | grep -oE '<link>[^<]+</link>' | sed 's/<link>//g; s/<\/link>//g' | head -1)
               DESC=$(echo "$item" | grep -oE '<description><!\[CDATA\[[^\]]*\]\]></description>' | sed 's/<description><!\[CDATA\[//g; s/\]\]><\/description>//g' | head -1)
-              
+
               if [ -n "$TITLE" ] && [ -n "$LINK" ]; then
                 # 清理HTML标签
-                DESC=$(echo "$DESC" | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g; s/&amp;/&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g' | tr -s ' ')
+                DESC=$(echo "$DESC" | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g' | tr -s ' ')
                 # 截取描述前200字
                 DESC=$(echo "$DESC" | cut -c1-200)
                 NEWS_ARRAY+=("$TITLE|||$DESC|||$LINK")
               fi
             done
           fi
-          
+
           # ========== 2. 获取36kr财经新闻 ==========
           echo "获取36kr财经新闻..."
           KR_DATA=$(curl -s "https://36kr.com/api/newsflash?per_page=20" 2>/dev/null || echo "")
@@ -49,7 +49,7 @@ jobs:
             TITLES=$(echo "$KR_DATA" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//g' | head -15)
             URLS=$(echo "$KR_DATA" | grep -o '"news_url":"[^"]*"' | sed 's/"news_url":"//;s/"$//g' | head -15)
             DESCS=$(echo "$KR_DATA" | grep -o '"summary":"[^"]*"' | sed 's/"summary":"//;s/"$//g' | head -15)
-            
+
             paste <(echo "$TITLES") <(echo "$URLS") <(echo "$DESCS") 2>/dev/null | while IFS=$'\t' read -r title url desc; do
               if [ -n "$title" ] && [ "$url" != "null" ]; then
                 DESC_CLEAN=$(echo "$desc" | sed 's/<[^>]*>//g' | cut -c1-200)
@@ -57,12 +57,12 @@ jobs:
               fi
             done
           fi
-          
+
           # ========== 3. 如果新闻不够，补充AI科技新闻 ==========
           echo "获取AI科技新闻..."
           HN_DATA=$(curl -s "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null || echo "[]")
           HN_IDS=$(echo "$HN_DATA" | grep -oE '[0-9]+' | head -30)
-          
+
           for id in $HN_IDS; do
             if [ ${#NEWS_ARRAY[@]} -ge 15 ]; then
               break
@@ -71,7 +71,7 @@ jobs:
             TITLE=$(echo "$ITEM" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//' | head -1)
             URL=$(echo "$ITEM" | grep -o '"url":"[^"]*"' | sed 's/"url":"//;s/"$//' | head -1)
             SCORE=$(echo "$ITEM" | grep -o '"score":[0-9]*' | sed 's/"score"://' | head -1)
-            
+
             # 过滤财经科技相关
             if echo "$TITLE" | grep -qiE "AI|fintech|stock|market|crypto|bank|tech|robot|automated|system|software|data|cloud|startup|fund|invest"; then
               if [ -n "$TITLE" ] && [ -n "$URL" ] && [ "$SCORE" -gt 50 ]; then
@@ -79,9 +79,9 @@ jobs:
               fi
             fi
           done
-          
+
           echo "获取到 ${#NEWS_ARRAY[@]} 条新闻"
-          
+
           # ========== 4. 选取10条新闻 ==========
           SELECTED_NEWS=()
           for i in $(seq 0 9); do
@@ -89,7 +89,7 @@ jobs:
               SELECTED_NEWS+=("${NEWS_ARRAY[$i]}")
             fi
           done
-          
+
           # ========== 5. 构建新闻列表 ==========
           NEWS_LIST=""
           for i in "${!SELECTED_NEWS[@]}"; do
@@ -99,10 +99,10 @@ jobs:
             url=$(echo "$news" | cut -d'|' -f3)
             NEWS_LIST="${NEWS_LIST}${i}. $title\n   摘要: $desc\n   链接: $url\n\n"
           done
-          
+
           # ========== 6. 调用AI生成摘要 ==========
           echo "调用AI生成精炼摘要..."
-          
+
           PROMPT="你是一个专业的财经科技新闻编辑。请为以下10条新闻生成简洁的中文摘要，每条50字左右。
 
 新闻列表：
@@ -134,22 +134,22 @@ $NEWS_LIST
               "max_tokens": 2000,
               "temperature": 0.7
             }')
-          
+
           # 解析AI响应
           SUMMARY=$(echo "$RESPONSE" | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -1)
-          
+
           # 清理转义字符
           SUMMARY=$(echo "$SUMMARY" | sed 's/\\n/\n/g; s/\\"/"/g')
-          
+
           if [ -z "$SUMMARY" ] || [ "$SUMMARY" == "null" ]; then
             # 如果AI生成失败，使用原始新闻
             SUMMARY="$NEWS_LIST"
           fi
-          
+
           # ========== 7. 构建最终消息 ==========
           TODAY=$(date "+%Y年%m月%d日")
           TIME=$(date "+%H:%M")
-          
+
           FINAL_MSG="📊 每日财经科技新闻
 ━━━━━━━━━━━━━━━━━━
 $TODAY | 🕐 $TIME
@@ -159,13 +159,13 @@ $SUMMARY
 ━━━━━━━━━━━━━━━━━━
 💡 点击链接查看详情
 🤖 AI摘要生成"
-          
+
           echo "发送消息到飞书..."
           echo -e "$FINAL_MSG"
-          
+
           # 发送到飞书
           curl -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"$FINAL_MSG\"}}"
-          
+
           echo "完成！共发送 ${#SELECTED_NEWS[@]} 条新闻"
