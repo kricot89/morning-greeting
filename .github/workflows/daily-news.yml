@@ -1,0 +1,25 @@
+name: Daily AI News
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 22 * * *'
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send News
+        env:
+          WEBHOOK: ${{ secrets.WEBHOOK }}
+          SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+        run: |
+          export TZ='Asia/Shanghai'
+          echo "Testing workflow at $(date)"
+          echo "Sending test message to Feishu..."
+
+          curl -X POST "$WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d '{"msg_type": "text", "content": {"text": "测试消息：财经新闻工作流已启动！\n时间：'"$(date "+%Y-%m-%d %H:%M:%S")"'"}}'
+
+          echo "Done!"
