@@ -11,10 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Send test message
+      - name: Send message to Feishu
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
+          MESSAGE='馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿
+
+鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒'
+          
+          JSON=$(jq -n --arg text "$MESSAGE" '{msg_type: "text", content: {text: $text}}')
+          
           curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d '{"msg_type":"text","content":{"text":"馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿娴嬭瘯\n\n鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒"}}'
+            -d "$JSON"
