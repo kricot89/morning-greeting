@@ -1,70 +1,25 @@
-name: 每日财经AI新闻摘要
+name: Daily AI News
 
 on:
   schedule:
-    # UTC 22:30 = 北京时间 6:30 (GitHub延迟约8:00收到)
     - cron: '30 22 * * *'
+  workflow_dispatch:
 
 jobs:
-  send:
+  send-news:
     runs-on: ubuntu-latest
     steps:
-      - name: 获取新闻并发送
+      - uses: actions/checkout@v4
+      
+      - name: Send news to Feishu
         env:
-          WEBHOOK: ${{ secrets.WEBHOOK }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          SILICON_API_KEY: ${{ secrets.SILICON_API_KEY }}
         run: |
-          export TZ='Asia/Shanghai'
+          curl -s "https://www.36kr.com/feed-newsflash" | grep -oP '(?<=<title>)[^<]+' | head -15 > titles.txt
           
-          echo "开始获取财经AI新闻..."
+          NEWS=$(cat titles.txt | head -10 | sed 's/^/- /' | tr '\n' '\n')
           
-          # 获取华尔街见闻新闻
-          echo "获取华尔街见闻..."
-          WS_NEWS=$(curl -s "https://wallstreetcn.com/rss" 2>/dev/null | grep -oE '<title><!\[CDATA\[[^\]]+\]\]></title>' | head -5 | sed 's/<title><!\[CDATA\[//g; s/\]\]><\/title>//g')
-          
-          # 获取Hacker News
-          echo "获取Hacker News..."
-          HN_IDS=$(curl -s "https://hacker-news.firebaseio.com/v0/topstories.json" 2>/dev/null | grep -oE '[0-9]+' | head -20)
-          
-          HN_NEWS=""
-          HN_COUNT=0
-          for id in $HN_IDS; do
-            if [ $HN_COUNT -ge 3 ]; then break; fi
-            ITEM=$(curl -s "https://hacker-news.firebaseio.com/v0/item/$id.json" 2>/dev/null)
-            TITLE=$(echo "$ITEM" | grep -o '"title":"[^"]*"' | sed 's/"title":"//;s/"$//')
-            SCORE=$(echo "$ITEM" | grep -o '"score":[0-9]*' | sed 's/"score"://')
-            
-            if echo "$TITLE" | grep -qiE "AI|GPT|fintech|market|startup"; then
-              if [ -n "$TITLE" ] && [ "${SCORE:-0}" -gt 100 ]; then
-                HN_NEWS="$HN_NEWS
-🌍 $TITLE"
-                HN_COUNT=$((HN_COUNT+1))
-              fi
-            fi
-          done
-          
-          # 构建消息
-          TODAY=$(date "+%Y年%m月%d日")
-          TIME=$(date "+%H:%M")
-          
-          MSG="📊 每日财经科技新闻
-━━━━━━━━━━━━━━━━━━
-$TODAY | 🕐 $TIME
-
-【国内新闻】
-$WS_NEWS
-
-【国际新闻】
-$HN_NEWS
-
-━━━━━━━━━━━━━━━━━━
-💡 点击链接查看详情"
-          
-          echo "发送消息..."
-          echo "$MSG"
-          
-          # 发送到飞书
-          curl -X POST "$WEBHOOK" \
+          curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"$MSG\"}}"
-          
-          echo "完成！"
+            -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"馃搳 姣忔棩璐㈢粡蹇\\n\\n$NEWS\"}}"
