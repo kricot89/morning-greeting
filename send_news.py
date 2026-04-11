@@ -4,12 +4,10 @@ import os
 import re
 from xml.etree import ElementTree as ET
 
-# 低价值关键词过滤（公告、招聘、活动等非新闻内容）
+# 低价值关键词过滤（仅过滤明显的非新闻内容）
 LOW_VALUE_KEYWORDS = [
     '招聘', '诚聘', '加入我们', '活动预告', '报名', '邀请函',
-    '公告', '通知', '免责声明', '版权声明', '转载',
-    '财报', '年报', '季报', '业绩快报', '停牌', '复牌',
-    '增持', '减持', '质押', '解禁', '分红', '派息'
+    '免责声明', '版权声明'
 ]
 
 def is_low_value(title):
@@ -158,9 +156,10 @@ def fetch_npr_news():
         return []
 
 def fetch_reuters_news():
-    """获取Reuters国际新闻"""
+    """获取Reuters国际新闻（使用RSSHub镜像）"""
     try:
-        url = "https://www.reutersagency.com/feed/?taxonomy=markets&post_type=reuters-best"
+        # 使用RSSHub的Reuters路由
+        url = "https://rsshub.app/reuters/world/china"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             content = response.read().decode('utf-8')
