@@ -158,11 +158,10 @@ def fetch_npr_news():
         print(f"NPR error: {e}")
         return []
 
-def fetch_reuters_news():
-    """获取Reuters国际新闻（使用RSSHub镜像）"""
+def fetch_bbc_news():
+    """获取BBC国际新闻"""
     try:
-        # 使用RSSHub的Reuters路由
-        url = "https://rsshub.app/reuters/world/china"
+        url = "https://feeds.bbci.co.uk/news/world/rss.xml"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             content = response.read().decode('utf-8')
@@ -179,11 +178,11 @@ def fetch_reuters_news():
                     news_list.append({
                         'title': title,
                         'url': link,
-                        'source': 'Reuters'
+                        'source': 'BBC'
                     })
         return news_list
     except Exception as e:
-        print(f"Reuters error: {e}")
+        print(f"BBC error: {e}")
         return []
 
 def translate_title(title):
@@ -257,14 +256,14 @@ def main():
     news_npr = fetch_npr_news()
     print(f"NPR: {len(news_npr)}条")
     
-    news_reuters = fetch_reuters_news()
-    print(f"Reuters: {len(news_reuters)}条")
+    news_bbc = fetch_bbc_news()
+    print(f"BBC: {len(news_bbc)}条")
     
     # 合并财经新闻：36氪3条 + 华尔街见闻3条
     finance_news = news_36kr[:3] + news_wsc[:3]
     
-    # 国际热点新闻（NPR + Reuters + HN）- 混合排序取前5
-    world_news_raw = news_npr + news_reuters
+    # 国际热点新闻（NPR + BBC + HN）- 混合排序取前5
+    world_news_raw = news_npr + news_bbc
     # HN 的科技新闻也混入国际板块（因为HN主要是美国科技圈热点）
     for item in news_hn[:3]:
         world_news_raw.append({
