@@ -58,8 +58,20 @@ def fetch_wsc_news():
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
+        
+        # Debug: print structure
+        print(f"WSC response code: {data.get('code')}")
+        print(f"WSC data keys: {list(data.keys()) if data else 'empty'}")
+        
         news_list = []
-        items = data.get('data', {}).get('items', [])
+        items = data.get('data', {}).get('items', []) if data.get('data') else []
+        print(f"WSC items count: {len(items)}")
+        
+        for item in items[:3]:  # Debug first 3 items
+            print(f"WSC item keys: {list(item.keys())}")
+            content = item.get('content', {})
+            print(f"WSC content keys: {list(content.keys()) if content else 'no content'}")
+        
         for item in items:
             content = item.get('content', {})
             title = content.get('title', '')
@@ -76,6 +88,8 @@ def fetch_wsc_news():
         return news_list
     except Exception as e:
         print(f"WSC error: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def fetch_hn_news():
