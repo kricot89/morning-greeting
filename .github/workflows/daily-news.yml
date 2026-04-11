@@ -17,12 +17,14 @@ jobs:
           import urllib.request
           import os
           
-          # Chinese message
-          title = "馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿"
-          body = "鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒"
+          # Use Unicode escape sequences for Chinese characters
+          # 姣忔棩璐㈢粡AI鏂伴椈鎽樿 = \u6bcf\u65e5\u8d22\u7ecfAI\u65b0\u95fb\u6458\u8981
+          # 鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒 = \u65b0\u95fb\u529f\u80fd\u5f00\u53d1\u4e2d\uff0c\u656c\u8bf7\u671f\u5f85\uff01
+          
+          title = "\ud83d\udcca \u6bcf\u65e5\u8d22\u7ecfAI\u65b0\u95fb\u6458\u8981"
+          body = "\u65b0\u95fb\u529f\u80fd\u5f00\u53d1\u4e2d\uff0c\u656c\u8bf7\u671f\u5f85\uff01"
           message = f"{title}\n\n{body}"
           
-          # Create payload
           payload = {
               "msg_type": "text",
               "content": {
@@ -30,9 +32,8 @@ jobs:
               }
           }
           
-          # Send to Feishu
           webhook = os.environ['FEISHU_WEBHOOK']
-          data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+          data = json.dumps(payload).encode('utf-8')
           
           req = urllib.request.Request(
               webhook,
