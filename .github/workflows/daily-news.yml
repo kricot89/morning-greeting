@@ -8,8 +8,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Send to Feishu
+      - name: Send news to Feishu
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
-          curl -X POST "$FEISHU_WEBHOOK" -H "Content-Type: application/json" -d '{"msg_type":"text","content":{"text":"Test from GitHub Actions"}}'
+          python3 << 'EOF'
+          import json
+          import urllib.request
+          import os
+          
+          # Chinese message
+          title = "馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿"
+          body = "鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒"
+          message = f"{title}\n\n{body}"
+          
+          # Create payload
+          payload = {
+              "msg_type": "text",
+              "content": {
+                  "text": message
+              }
+          }
+          
+          # Send to Feishu
+          webhook = os.environ['FEISHU_WEBHOOK']
+          data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+          
+          req = urllib.request.Request(
+              webhook,
+              data=data,
+              headers={'Content-Type': 'application/json'},
+              method='POST'
+          )
+          
+          with urllib.request.urlopen(req) as response:
+              print(response.read().decode())
+          EOF
