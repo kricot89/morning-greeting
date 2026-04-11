@@ -130,6 +130,60 @@ def fetch_hn_news():
         print(f"HN error: {e}")
         return []
 
+def fetch_npr_news():
+    """获取NPR国际新闻"""
+    try:
+        url = "https://feeds.npr.org/1001/rss.xml"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            content = response.read().decode('utf-8')
+        root = ET.fromstring(content)
+        items = root.findall('.//item')
+        news_list = []
+        for item in items[:5]:
+            title_elem = item.find('title')
+            link_elem = item.find('link')
+            if title_elem is not None and link_elem is not None:
+                title = title_elem.text or ""
+                link = link_elem.text or ""
+                if title and link:
+                    news_list.append({
+                        'title': title,
+                        'url': link,
+                        'source': 'NPR'
+                    })
+        return news_list
+    except Exception as e:
+        print(f"NPR error: {e}")
+        return []
+
+def fetch_reuters_news():
+    """获取Reuters国际新闻"""
+    try:
+        url = "https://www.reutersagency.com/feed/?taxonomy=markets&post_type=reuters-best"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            content = response.read().decode('utf-8')
+        root = ET.fromstring(content)
+        items = root.findall('.//item')
+        news_list = []
+        for item in items[:5]:
+            title_elem = item.find('title')
+            link_elem = item.find('link')
+            if title_elem is not None and link_elem is not None:
+                title = title_elem.text or ""
+                link = link_elem.text or ""
+                if title and link:
+                    news_list.append({
+                        'title': title,
+                        'url': link,
+                        'source': 'Reuters'
+                    })
+        return news_list
+    except Exception as e:
+        print(f"Reuters error: {e}")
+        return []
+
 def translate_title(title):
     """翻译Hacker News标题中的常见术语"""
     # 术语映射表
@@ -198,20 +252,29 @@ def main():
     news_hn = fetch_hn_news()
     print(f"Hacker News: {len(news_hn)}条")
     
+    news_npr = fetch_npr_news()
+    print(f"NPR: {len(news_npr)}条")
+    
+    news_reuters = fetch_reuters_news()
+    print(f"Reuters: {len(news_reuters)}条")
+    
     # 合并财经新闻并去重
     finance_news = remove_duplicates(news_36kr + news_wsc)
     # 取前5条
     finance_news = finance_news[:5]
     
-    # 科技新闻（HN）- 取前5条，翻译标题
-    tech_news = []
-    for item in news_hn[:5]:
-        translated = translate_title(item['title'])
-        tech_news.append({
-            'title': translated,
+    # 国际热点新闻（NPR + Reuters + HN）- 混合排序取前5
+    world_news_raw = news_npr + news_reuters
+    # HN 的科技新闻也混入国际板块（因为HN主要是美国科技圈热点）
+    for item in news_hn[:3]:
+        world_news_raw.append({
+            'title': translate_title(item['title']),
             'url': item['url'],
             'source': 'Hacker News'
         })
+    
+    # 去重后取前5条
+    world_news = remove_duplicates(world_news_raw)[:5]
     
     # 构建消息
     title = "📊 每日新闻速递"
@@ -225,15 +288,15 @@ def main():
             lines.append(f"   🔗 {item['url']}")
         lines.append("")
     
-    # 科技板块
-    if tech_news:
-        lines.append("💻 国际科技")
-        for i, item in enumerate(tech_news, 1):
+    # 国际热点板块
+    if world_news:
+        lines.append("🌍 国际热点")
+        for i, item in enumerate(world_news, 1):
             lines.append(f"{i}. {item['title']}")
             lines.append(f"   🔗 {item['url']}")
         lines.append("")
     
-    if not finance_news and not tech_news:
+    if not finance_news and not world_news:
         lines.append("暂无新闻数据")
     
     message = "\n".join(lines)
