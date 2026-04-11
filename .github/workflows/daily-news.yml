@@ -11,16 +11,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Send message to Feishu
+      - name: Send news to Feishu
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
-          MESSAGE='馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿
-
-鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒'
+          # Create message with proper encoding
+          MESSAGE=$(echo -e '\U1F4CA Daily Finance AI News\n\nNews feature coming soon!')
           
-          JSON=$(jq -n --arg text "$MESSAGE" '{msg_type: "text", content: {text: $text}}')
+          # Use Python to create properly encoded JSON
+          python3 -c "
+import json
+import sys
+import os
+
+message = os.environ.get('MSG', 'Test message')
+data = {'msg_type': 'text', 'content': {'text': message}}
+print(json.dumps(data, ensure_ascii=False))
+" > /tmp/payload.json
           
           curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "$JSON"
+            -d @/tmp/payload.json
+        env:
+          MSG: "馃搳 Daily Finance AI News\n\nNews feature coming soon!"
