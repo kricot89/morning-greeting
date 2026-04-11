@@ -59,23 +59,14 @@ def fetch_wsc_news():
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
         
-        # Debug: print structure
-        print(f"WSC response code: {data.get('code')}")
-        print(f"WSC data keys: {list(data.keys()) if data else 'empty'}")
-        
         news_list = []
         items = data.get('data', {}).get('items', []) if data.get('data') else []
-        print(f"WSC items count: {len(items)}")
-        
-        for item in items[:3]:  # Debug first 3 items
-            print(f"WSC item keys: {list(item.keys())}")
-            content = item.get('content', {})
-            print(f"WSC content keys: {list(content.keys()) if content else 'no content'}")
         
         for item in items:
-            content = item.get('content', {})
-            title = content.get('title', '')
-            uri = content.get('uri', '')
+            # API结构: item.resource (以前是 item.content)
+            resource = item.get('resource', {})
+            title = resource.get('title', '')
+            uri = resource.get('uri', '')
             # 过滤低价值内容
             if title and uri and not is_low_value(title):
                 news_list.append({
@@ -88,8 +79,6 @@ def fetch_wsc_news():
         return news_list
     except Exception as e:
         print(f"WSC error: {e}")
-        import traceback
-        traceback.print_exc()
         return []
 
 def fetch_hn_news():
