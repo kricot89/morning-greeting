@@ -17,4 +17,4 @@ jobs:
         run: |
           curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d '{"msg_type": "text", "content": {"text": "馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿娴嬭瘯\n\n杩欐槸涓€鏉℃祴璇曟秷鎭€傚鏋滀綘鑳芥敹鍒帮紝璇存槑閰嶇疆鎴愬姛锛?}}'
+            -d '{"msg_type": "text", "content": {"text": "Test message from GitHub Actions"}}'
