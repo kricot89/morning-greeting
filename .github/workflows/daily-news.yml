@@ -11,16 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Fetch and send news
+      - name: Send test message
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
-          # Get 36kr news
-          NEWS=$(curl -s "https://www.36kr.com/feed-newsflash" | grep -oP '(?<=<title>)[^<]+' | tail -n +2 | head -10 | sed 's/^/- /')
-          
-          # Send to Feishu
-          MESSAGE=$(echo -e "馃搳 姣忔棩璐㈢粡蹇\\n\\n$NEWS")
-          
           curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"$MESSAGE\"}}"
+            -d '{"msg_type":"text","content":{"text":"馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿娴嬭瘯\n\n鏂伴椈鍔熻兘寮€鍙戜腑锛屾暚璇锋湡寰咃紒"}}'
