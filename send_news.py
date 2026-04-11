@@ -258,10 +258,8 @@ def main():
     news_reuters = fetch_reuters_news()
     print(f"Reuters: {len(news_reuters)}条")
     
-    # 合并财经新闻并去重
-    finance_news = remove_duplicates(news_36kr + news_wsc)
-    # 取前5条
-    finance_news = finance_news[:5]
+    # 合并财经新闻：36氪3条 + 华尔街见闻3条
+    finance_news = news_36kr[:3] + news_wsc[:3]
     
     # 国际热点新闻（NPR + Reuters + HN）- 混合排序取前5
     world_news_raw = news_npr + news_reuters
