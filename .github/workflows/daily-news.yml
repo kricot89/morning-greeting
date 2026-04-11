@@ -14,12 +14,7 @@ jobs:
       - name: Send news to Feishu
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-          SILICON_API_KEY: ${{ secrets.SILICON_API_KEY }}
         run: |
-          curl -s "https://www.36kr.com/feed-newsflash" | grep -oP '(?<=<title>)[^<]+' | head -15 > titles.txt
-          
-          NEWS=$(cat titles.txt | head -10 | sed 's/^/- /' | tr '\n' '\n')
-          
           curl -X POST "$FEISHU_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "{\"msg_type\": \"text\", \"content\": {\"text\": \"馃搳 姣忔棩璐㈢粡蹇\\n\\n$NEWS\"}}"
+            -d '{"msg_type": "text", "content": {"text": "馃搳 姣忔棩璐㈢粡AI鏂伴椈鎽樿娴嬭瘯\n\n杩欐槸涓€鏉℃祴璇曟秷鎭€傚鏋滀綘鑳芥敹鍒帮紝璇存槑閰嶇疆鎴愬姛锛?}}'
